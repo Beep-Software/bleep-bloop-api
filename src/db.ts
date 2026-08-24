@@ -27,3 +27,23 @@ export const GRFPool = async (): Promise<sql.ConnectionPool> => {
         throw err;
     }
 };
+
+export const beepPool = async (): Promise<sql.ConnectionPool> => {
+    if (pool) return pool;
+
+    try {
+        pool = await new sql.ConnectionPool(config).connect();
+        console.log('Connected to MSSQL');
+        return pool;
+    } catch (err) {
+        console.error('Database Connection Failed! Bad Config:', err);
+        throw err;
+    }
+};
+
+export const closePool = async (): Promise<void> => {
+    if (pool) {
+        await pool.close();
+        pool = null;
+    }
+};
