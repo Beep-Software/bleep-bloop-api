@@ -65,6 +65,20 @@ jobs:
             --from-literal=DEFAULT_EMAIL_TO="${{ secrets.DEFAULT_EMAIL_TO }}" \
             --dry-run=client -o yaml | kubectl apply -f -
 
+      - name: Create/update database secrets
+        if: github.event_name == 'push'
+        env:
+          KUBECONFIG: /home/dobowe01/.kube/config
+        run: |
+          kubectl create secret generic bleep-bloop-api-database \
+            -n bleep-api \
+            --from-literal=DB_USER="${{ secrets.DB_USER }}" \
+            --from-literal=DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
+            --from-literal=DB_SERVER="${{ secrets.DB_SERVER }}" \
+            --from-literal=DB_PORT="${{ secrets.DB_PORT }}" \
+            --from-literal=DB_NAME="${{ secrets.DB_NAME }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
       - name: Apply Kubernetes manifests
         if: github.event_name == 'push'
         env:
