@@ -58,7 +58,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: bleep-bloop-api-email
-                  key: GMAIL_USER
+                  key: DEFAULT_EMAIL_TO
 
             - name: DB_USER
               valueFrom:
