@@ -2,7 +2,7 @@ import fastify, { FastifyInstance } from 'fastify'
 import cors from '@fastify/cors'
 
 import Auth from './routers/auth'
-import Files from './routers/files'
+import Documents from './routers/documents'
 import Email from './routers/email'
 import Sql from './routers/sql'
 import GRF from './routers/GRF'
@@ -31,7 +31,7 @@ export default async function App(): Promise<FastifyInstance> {
 
     await app.register(async function (api) {
         api.register(Auth, { prefix: '/auth' })
-        api.register(Files, { prefix: '/files' })
+        api.register(Documents, { prefix: '/documents' })
         api.register(Email, { prefix: '/email' })
         api.register(Sql, { prefix: '/sql' })
         api.register(GRF, { prefix: '/GRF' })

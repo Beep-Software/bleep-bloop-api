@@ -59,3 +59,12 @@ spec:
                 secretKeyRef:
                   name: bleep-bloop-api-email
                   key: DEFAULT_EMAIL_TO
+
+          volumeMounts:
+            - name: file-storage
+              mountPath: /app/storage
+
+      volumes:
+        - name: file-storage
+          persistentVolumeClaim:
+            claimName: file-storage-pvc

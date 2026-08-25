@@ -33,7 +33,7 @@ npm run start-dev
 ### 3) Send a test email to bowen61496@gmail.com
 
 ```bash
-curl -X POST "http://localhost:1337/api/email/test" \
+curl -X POST "http://localhost:3000/api/email/test" \
 	-H "Content-Type: application/json" \
 	-d '{
 		"to": "bowen61496@gmail.com",
@@ -43,5 +43,25 @@ curl -X POST "http://localhost:1337/api/email/test" \
 ```
 
 Expected successful response includes `success: true` and a `messageId`.
+
+## Test Documents Route
+
+Use these routes to create and read a file through the file storage service.
+
+### Create a file (content must be base64-encoded)
+
+```bash
+curl -X POST "http://localhost:3000/api/documents/test/hello.txt" \
+	-H "Content-Type: application/json" \
+	-d "{\"content\": \"$(echo -n 'Hello from bleep-bloop-api' | base64)\"}"
+```
+
+### Read the file back
+
+```bash
+curl "http://localhost:3000/api/documents/test/hello.txt"
+```
+
+Expected successful response includes `success: true` and a base64 `content` field.
 
 This is a test
