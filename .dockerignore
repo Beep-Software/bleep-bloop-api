@@ -8,3 +8,4 @@ Dockerfile
 .env
 .env.*
 coverage
+/storage

@@ -6,7 +6,7 @@ const config: sql.config = {
     password: process.env.DB_PASSWORD,
     server: process.env.DB_SERVER!,
     database: process.env.DB_NAME!,
-    port: Number(process.env.DB_PORT),
+    port: Number(process.env.DB_PORT ?? (process.env.NODE_ENV === 'production' ? 51433 : 1443)),
     options: {
         encrypt: false,
         trustServerCertificate: true,

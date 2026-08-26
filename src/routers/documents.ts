@@ -1,6 +1,7 @@
 import { FastifyPluginAsync } from 'fastify'
 
 import DocumentsController from '../controllers/documents'
+import DocumentsService from '../services/documents'
 import {
     CreateDocumentRequest,
     ReadDocumentRequest,
@@ -9,6 +10,11 @@ import {
 } from '../types/requests/documentsRequests'
 
 export const Documents: FastifyPluginAsync = async (fastify) => {
+
+    fastify.get('/wiki', async () => ({
+        success: true,
+        documents: await DocumentsService.listWiki()
+    }))
 
     fastify.post<CreateDocumentRequest>('/*', async (req, res) => {
         return DocumentsController.create(req.params['*'], req.body.content)
