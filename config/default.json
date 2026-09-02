@@ -5,5 +5,13 @@
     },
     "fileStorage": {
         "root": "./storage"
+    },
+    "auth": {
+        "beepAuthUrl": "http://localhost:5000"
+    },
+    "jwt": {
+        "issuer": "BeepAuth",
+        "audience": "JwtAudience",
+        "key": "BeepAuthKeyBeepAuthKeyBeepAuthKey"
     }
 }

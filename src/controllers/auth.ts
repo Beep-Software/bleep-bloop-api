@@ -11,4 +11,12 @@ export default class AuthController {
         return AuthService.register(credentials)
     }
 
+    static async refreshToken(refreshToken: string) {
+        return AuthService.refreshToken(refreshToken)
+    }
+
+    static async logout(refreshToken: string) {
+        return AuthService.logout(refreshToken)
+    }
+
 }

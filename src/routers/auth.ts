@@ -16,6 +16,24 @@ export const Auth: FastifyPluginAsync = async (fastify) => {
         return AuthController.register(credentials)
     })
 
+    // Refresh token endpoint
+    fastify.post<{ Body: { refreshToken: string } }>('/refresh', async (req, res) => {
+        const { refreshToken } = req.body
+        if (!refreshToken) {
+            return res.status(400).send({ error: 'Refresh token is required' })
+        }
+        return AuthController.refreshToken(refreshToken)
+    })
+
+    // Logout endpoint
+    fastify.post<{ Body: { refreshToken: string } }>('/logout', async (req, res) => {
+        const { refreshToken } = req.body
+        if (!refreshToken) {
+            return res.status(400).send({ error: 'Refresh token is required' })
+        }
+        return AuthController.logout(refreshToken)
+    })
+
 }
 
 export default Auth
