@@ -13,7 +13,8 @@ import { validateJWT } from './middleware/jwt'
 export default async function App(): Promise<FastifyInstance> {
     const app = fastify({
         logger: true,
-        trustProxy: true
+        trustProxy: true,
+        requestTimeout: 120000
     })
 
     const allowedOrigins = [

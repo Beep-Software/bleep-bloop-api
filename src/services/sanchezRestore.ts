@@ -13,8 +13,8 @@ import {
 } from '../types/sanchezRestore'
 
 const STORAGE_ROOT = path.resolve(config.get<string>('fileStorage.root'))
+const STORAGE_ROOT_CONFIG = config.get<string>('fileStorage.root')
 const IMAGE_ROOT = 'sanchez-restore-more/images'
-const IMAGE_STORAGE_ROOT = '/srv/file-storage/images'
 const ALLOWED_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif'])
 const MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'])
 const MAX_IMAGE_SIZE = 25 * 1024 * 1024
@@ -51,6 +51,19 @@ function safeRelativePath(relativePath: string): string {
     const fullPath = path.resolve(STORAGE_ROOT, normalized)
     if (fullPath !== STORAGE_ROOT && !fullPath.startsWith(STORAGE_ROOT + path.sep)) throw new Error('Invalid file path')
     return normalized
+}
+
+function getImageMetadata(relativePath: string): { fileUuid: string, fileExtension: string, year: number, month: number, day: number } {
+    const normalizedPath = relativePath.replace(/\\/g, '/')
+    const match = normalizedPath.match(/^sanchez-restore-more\/images\/(\d{4})\/(\d{2})\/(\d{2})\/([0-9a-f-]{36})\.(jpg|jpeg|png|webp|gif|avif)$/i)
+    if (!match) throw new Error('Sanchez Restore images must use the YYYY/MM/DD/<uuid>.<extension> path format')
+    return {
+        fileUuid: match[4],
+        fileExtension: `.${match[5].toLowerCase()}`,
+        year: Number(match[1]),
+        month: Number(match[2]),
+        day: Number(match[3])
+    }
 }
 
 function extensionFor(fileName: string, mimeType: string): string {
@@ -90,10 +103,11 @@ async function writeImage(input: UploadImageInput): Promise<{ relativePath: stri
     const month = now.getUTCMonth() + 1
     const day = now.getUTCDate()
     const relativePath = `${IMAGE_ROOT}/${year}/${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}/${fileUuid}.${extension}`
+    const metadata = getImageMetadata(relativePath)
     const fullPath = path.resolve(STORAGE_ROOT, safeRelativePath(relativePath))
     await fs.mkdir(path.dirname(fullPath), { recursive: true })
     await fs.writeFile(fullPath, input.buffer, { flag: 'wx' })
-    return { relativePath, fullPath, fileName: path.basename(relativePath), fileUuid, fileExtension: `.${extension}`, year, month, day }
+    return { relativePath, fullPath, fileName: path.basename(relativePath), ...metadata }
 }
 
 async function cleanupFiles(paths: string[]): Promise<void> {
@@ -126,18 +140,28 @@ export default class SanchezRestoreService {
         const pool = await beepPool()
         const transaction = new sql.Transaction(pool)
         const writtenFiles: string[] = []
+        const startedAt = Date.now()
         try {
-            await transaction.begin()
-            const rows = await executeRowsOn<Record<string, unknown>>(new sql.Request(transaction), 'beep.sanchez_restore_project_create', { slug: slugFor(input.title), title: input.title, category: input.category, description: input.description ?? '' })
-            if (!rows[0]) throw new Error('Project was not created')
-            const project = mapProject(rows[0])
+            console.info('[sanchezRestore] create project: writing files', { imageCount: input.images.length })
+            const files = []
             for (const [index, imageInput] of input.images.entries()) {
                 imageInput.title = input.title
                 const file = await writeImage(imageInput)
                 writtenFiles.push(file.fullPath)
-                await executeRowsOn(new sql.Request(transaction), 'beep.sanchez_restore_image_create', { projectId: project.id, title: imageInput.title, storageRoot: IMAGE_STORAGE_ROOT, relativePath: file.relativePath, fileName: file.fileName, fileUuid: file.fileUuid, fileExtension: file.fileExtension, fileYear: file.year, fileMonth: file.month, fileDay: file.day, mimeType: imageInput.mimeType, fileSize: imageInput.buffer.length, sortOrder: imageInput.sortOrder ?? index })
+                files.push({ file, imageInput, index })
+            }
+            console.info('[sanchezRestore] create project: files written', { elapsedMs: Date.now() - startedAt })
+
+            await transaction.begin()
+            console.info('[sanchezRestore] create project: transaction started')
+            const rows = await executeRowsOn<Record<string, unknown>>(new sql.Request(transaction), 'beep.sanchez_restore_project_create', { slug: slugFor(input.title), title: input.title, category: input.category, description: input.description ?? '' })
+            if (!rows[0]) throw new Error('Project was not created')
+            const project = mapProject(rows[0])
+            for (const { file, imageInput, index } of files) {
+                await executeRowsOn(new sql.Request(transaction), 'beep.sanchez_restore_image_create', { projectId: project.id, title: imageInput.title, storageRoot: STORAGE_ROOT_CONFIG, relativePath: file.relativePath, fileName: file.fileName, fileUuid: file.fileUuid, fileExtension: file.fileExtension, fileYear: file.year, fileMonth: file.month, fileDay: file.day, mimeType: imageInput.mimeType, fileSize: imageInput.buffer.length, sortOrder: imageInput.sortOrder ?? index })
             }
             await transaction.commit()
+            console.info('[sanchezRestore] create project: transaction committed', { elapsedMs: Date.now() - startedAt })
             project.images = await this.listImages(project.id)
             return project
         } catch (error) {
@@ -163,7 +187,7 @@ export default class SanchezRestoreService {
                 imageInput.title = input.title ?? project.title
                 const file = await writeImage(imageInput)
                 writtenFiles.push(file.fullPath)
-                await executeRowsOn(new sql.Request(transaction), 'beep.sanchez_restore_image_create', { projectId: id, title: imageInput.title, storageRoot: IMAGE_STORAGE_ROOT, relativePath: file.relativePath, fileName: file.fileName, fileUuid: file.fileUuid, fileExtension: file.fileExtension, fileYear: file.year, fileMonth: file.month, fileDay: file.day, mimeType: imageInput.mimeType, fileSize: imageInput.buffer.length, sortOrder: imageInput.sortOrder ?? index })
+                await executeRowsOn(new sql.Request(transaction), 'beep.sanchez_restore_image_create', { projectId: id, title: imageInput.title, storageRoot: STORAGE_ROOT_CONFIG, relativePath: file.relativePath, fileName: file.fileName, fileUuid: file.fileUuid, fileExtension: file.fileExtension, fileYear: file.year, fileMonth: file.month, fileDay: file.day, mimeType: imageInput.mimeType, fileSize: imageInput.buffer.length, sortOrder: imageInput.sortOrder ?? index })
             }
             await transaction.commit()
             project.images = await this.listImages(id)
@@ -189,6 +213,7 @@ export default class SanchezRestoreService {
         const rows = await executeRows<Record<string, unknown>>('beep.sanchez_restore_image_get', { imageId: id })
         if (!rows[0]) return null
         const image = mapImage(rows[0])
+        getImageMetadata(image.relativePath)
         return { image, fullPath: path.resolve(STORAGE_ROOT, safeRelativePath(image.relativePath)) }
     }
 
@@ -198,7 +223,7 @@ export default class SanchezRestoreService {
             const rows = await executeRows<Record<string, unknown>>('beep.sanchez_restore_image_create', {
                 projectId: input.projectId,
                 title: input.title ?? 'Portfolio image',
-                storageRoot: IMAGE_STORAGE_ROOT,
+                storageRoot: STORAGE_ROOT_CONFIG,
                 relativePath: file.relativePath,
                 fileName: file.fileName,
                 fileUuid: file.fileUuid,

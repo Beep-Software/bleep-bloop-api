@@ -7,6 +7,8 @@ const config: sql.config = {
     server: process.env.DB_SERVER!,
     database: process.env.DB_NAME!,
     port: Number(process.env.DB_PORT ?? (process.env.NODE_ENV === 'production' ? 51433 : 1443)),
+    connectionTimeout: 10000,
+    requestTimeout: 60000,
     options: {
         encrypt: false,
         trustServerCertificate: true,
