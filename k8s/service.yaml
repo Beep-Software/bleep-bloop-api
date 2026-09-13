@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: bleep-bloop-api-service
-  namespace: default
+  namespace: bleep-api
 spec:
   type: NodePort
   selector:
