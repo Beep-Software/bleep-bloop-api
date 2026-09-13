@@ -34,7 +34,9 @@ export const SanchezRestore: FastifyPluginAsync = async (fastify) => {
         return { success: true, project, images: await SanchezRestoreController.listImages(project.id) }
     })
     fastify.post('/projects', { preHandler: validateJWT }, async request => {
-        const project = await SanchezRestoreController.createProject(await parseProjectForm(request, false) as CreateProjectInput)
+        const parsed = await parseProjectForm(request, false) as CreateProjectInput
+        request.log.info({ imageCount: parsed.images.length }, 'sanchezRestore project upload parsed')
+        const project = await SanchezRestoreController.createProject(parsed)
         return { success: true, project }
     })
     fastify.put<{ Params: { id: string } }>('/projects/:id', { preHandler: validateJWT }, async (request, reply) => {

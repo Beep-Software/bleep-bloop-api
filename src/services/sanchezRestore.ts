@@ -141,6 +141,7 @@ export default class SanchezRestoreService {
         const transaction = new sql.Transaction(pool)
         const writtenFiles: string[] = []
         const startedAt = Date.now()
+        let transactionStarted = false
         try {
             console.info('[sanchezRestore] create project: writing files', { imageCount: input.images.length })
             const files = []
@@ -153,19 +154,26 @@ export default class SanchezRestoreService {
             console.info('[sanchezRestore] create project: files written', { elapsedMs: Date.now() - startedAt })
 
             await transaction.begin()
+            transactionStarted = true
             console.info('[sanchezRestore] create project: transaction started')
             const rows = await executeRowsOn<Record<string, unknown>>(new sql.Request(transaction), 'beep.sanchez_restore_project_create', { slug: slugFor(input.title), title: input.title, category: input.category, description: input.description ?? '' })
             if (!rows[0]) throw new Error('Project was not created')
             const project = mapProject(rows[0])
+            console.info('[sanchezRestore] create project: project metadata created', { projectId: project.id, elapsedMs: Date.now() - startedAt })
+            const createdImages: PortfolioImage[] = []
             for (const { file, imageInput, index } of files) {
-                await executeRowsOn(new sql.Request(transaction), 'beep.sanchez_restore_image_create', { projectId: project.id, title: imageInput.title, storageRoot: STORAGE_ROOT_CONFIG, relativePath: file.relativePath, fileName: file.fileName, fileUuid: file.fileUuid, fileExtension: file.fileExtension, fileYear: file.year, fileMonth: file.month, fileDay: file.day, mimeType: imageInput.mimeType, fileSize: imageInput.buffer.length, sortOrder: imageInput.sortOrder ?? index })
+                const imageRows = await executeRowsOn<Record<string, unknown>>(new sql.Request(transaction), 'beep.sanchez_restore_image_create', { projectId: project.id, title: imageInput.title, storageRoot: STORAGE_ROOT_CONFIG, relativePath: file.relativePath, fileName: file.fileName, fileUuid: file.fileUuid, fileExtension: file.fileExtension, fileYear: file.year, fileMonth: file.month, fileDay: file.day, mimeType: imageInput.mimeType, fileSize: imageInput.buffer.length, sortOrder: imageInput.sortOrder ?? index })
+                if (!imageRows[0]) throw new Error('Image metadata was not created')
+                createdImages.push(mapImage(imageRows[0]))
+                console.info('[sanchezRestore] create project: image metadata created', { projectId: project.id, elapsedMs: Date.now() - startedAt })
             }
             await transaction.commit()
+            transactionStarted = false
             console.info('[sanchezRestore] create project: transaction committed', { elapsedMs: Date.now() - startedAt })
-            project.images = await this.listImages(project.id)
+            project.images = createdImages
             return project
         } catch (error) {
-            await transaction.rollback().catch(() => undefined)
+            if (transactionStarted) await transaction.rollback().catch(() => undefined)
             await cleanupFiles(writtenFiles)
             throw error
         }
