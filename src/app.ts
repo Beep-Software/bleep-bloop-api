@@ -1,5 +1,6 @@
 import fastify, { FastifyInstance } from 'fastify'
 import cors from '@fastify/cors'
+import multipart from '@fastify/multipart'
 
 import Auth from './routers/auth'
 import Documents from './routers/documents'
@@ -35,6 +36,7 @@ export default async function App(): Promise<FastifyInstance> {
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
         optionsSuccessStatus: 204
     })
+    await app.register(multipart, { limits: { fileSize: 25 * 1024 * 1024, files: 20, fields: 20 } })
 
     // Register auth routes (no authentication required for login/register)
     await app.register(Auth, { prefix: '/auth' })
