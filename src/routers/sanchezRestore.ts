@@ -4,17 +4,21 @@ import SanchezRestoreController from '../controllers/sanchezRestore'
 import { validateJWT } from '../middleware/jwt'
 import { CreateProjectInput, UpdateProjectInput, UploadImageInput } from '../types/sanchezRestore'
 
-async function parseProjectForm(request: FastifyRequest, includeRemovedImages: boolean): Promise<CreateProjectInput | UpdateProjectInput> {
+export async function parseProjectForm(request: FastifyRequest, includeRemovedImages: boolean): Promise<CreateProjectInput | UpdateProjectInput> {
     const fields: Record<string, string> = {}
     const removedImageIds: string[] = []
     const images: UploadImageInput[] = []
     for await (const part of request.parts()) {
         if (part.type === 'file') {
+            if (part.fieldname !== 'images') throw new Error('Unexpected file field')
+            if (!part.filename) throw new Error('Image filename is required')
+            const buffer = await part.toBuffer()
+            if (!buffer.length) throw new Error('Image file is empty')
             images.push({
                 projectId: '',
                 fileName: part.filename,
                 mimeType: part.mimetype,
-                buffer: await part.toBuffer(),
+                buffer,
                 sortOrder: images.length
             })
         } else if (part.fieldname === 'removedImageIds' && includeRemovedImages) {
@@ -26,6 +30,29 @@ async function parseProjectForm(request: FastifyRequest, includeRemovedImages: b
     return { title: fields.title?.trim() ?? '', category: fields.category?.trim() ?? '', description: fields.description ?? '', images, ...(includeRemovedImages ? { removedImageIds } : {}) } as CreateProjectInput | UpdateProjectInput
 }
 
+function parseProjectJson(body: unknown, includeRemovedImages: boolean): CreateProjectInput | UpdateProjectInput {
+    const value = body as { title?: unknown, category?: unknown, description?: unknown, images?: unknown, removedImageIds?: unknown }
+    const images = Array.isArray(value.images) ? value.images.map((image, index) => {
+        const item = image as { fileName?: unknown, mimeType?: unknown, content?: unknown }
+        if (typeof item.fileName !== 'string' || typeof item.mimeType !== 'string' || typeof item.content !== 'string') throw new Error('Invalid image payload')
+        const buffer = Buffer.from(item.content, 'base64')
+        if (!buffer.length) throw new Error('Image file is empty')
+        return { projectId: '', fileName: item.fileName, mimeType: item.mimeType, buffer, sortOrder: index }
+    }) : []
+    return {
+        title: typeof value.title === 'string' ? value.title.trim() : '',
+        category: typeof value.category === 'string' ? value.category.trim() : '',
+        description: typeof value.description === 'string' ? value.description : '',
+        images,
+        ...(includeRemovedImages ? { removedImageIds: Array.isArray(value.removedImageIds) ? value.removedImageIds.map(String) : [] } : {})
+    } as CreateProjectInput | UpdateProjectInput
+}
+
+async function parseProjectRequest(request: FastifyRequest, includeRemovedImages: boolean): Promise<CreateProjectInput | UpdateProjectInput> {
+    if (request.isMultipart()) return parseProjectForm(request, includeRemovedImages)
+    return parseProjectJson(request.body, includeRemovedImages)
+}
+
 export const SanchezRestore: FastifyPluginAsync = async (fastify) => {
     fastify.get('/projects', async () => ({ success: true, projects: await SanchezRestoreController.listProjects() }))
     fastify.get<{ Params: { id: string } }>('/projects/:id', async (request, reply) => {
@@ -34,13 +61,13 @@ export const SanchezRestore: FastifyPluginAsync = async (fastify) => {
         return { success: true, project, images: await SanchezRestoreController.listImages(project.id) }
     })
     fastify.post('/projects', { preHandler: validateJWT }, async request => {
-        const parsed = await parseProjectForm(request, false) as CreateProjectInput
+        const parsed = await parseProjectRequest(request, false) as CreateProjectInput
         request.log.info({ imageCount: parsed.images.length }, 'sanchezRestore project upload parsed')
         const project = await SanchezRestoreController.createProject(parsed)
         return { success: true, project }
     })
     fastify.put<{ Params: { id: string } }>('/projects/:id', { preHandler: validateJWT }, async (request, reply) => {
-        const project = await SanchezRestoreController.updateProject(request.params.id, await parseProjectForm(request, true) as UpdateProjectInput)
+        const project = await SanchezRestoreController.updateProject(request.params.id, await parseProjectRequest(request, true) as UpdateProjectInput)
         if (!project) return reply.code(404).send({ error: 'Project not found' })
         return { success: true, project }
     })

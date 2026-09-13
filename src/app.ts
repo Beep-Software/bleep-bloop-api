@@ -14,7 +14,8 @@ export default async function App(): Promise<FastifyInstance> {
     const app = fastify({
         logger: true,
         trustProxy: true,
-        requestTimeout: 120000
+        requestTimeout: 120000,
+        bodyLimit: 50 * 1024 * 1024
     })
 
     const allowedOrigins = [
