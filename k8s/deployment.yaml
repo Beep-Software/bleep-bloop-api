@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: bleep-bloop-api
-  namespace: default
+  namespace: bleep-bloop-api
   labels:
     app: bleep-bloop-api
 spec:

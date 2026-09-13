@@ -65,7 +65,7 @@ jobs:
           KUBECONFIG: /home/dobowe01/.kube/config
         run: |
           kubectl create secret generic bleep-bloop-api-email \
-            -n default \
+            -n bleep-bloop-api \
             --from-literal=GMAIL_USER="${{ secrets.GMAIL_USER }}" \
             --from-literal=GMAIL_APP_PASSWORD="${{ secrets.GMAIL_APP_PASSWORD }}" \
             --from-literal=DEFAULT_EMAIL_TO="${{ secrets.DEFAULT_EMAIL_TO }}" \
@@ -77,7 +77,7 @@ jobs:
           KUBECONFIG: /home/dobowe01/.kube/config
         run: |
           kubectl create secret generic bleep-bloop-api-database \
-            -n default \
+            -n bleep-bloop-api \
             --from-literal=DB_USER="${{ secrets.DB_USER }}" \
             --from-literal=DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
             --from-literal=DB_SERVER="${{ secrets.DB_SERVER }}" \
@@ -100,7 +100,7 @@ jobs:
         run: |
           kubectl set image deployment/bleep-bloop-api \
             bleep-bloop-api=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
-            -n default
+            -n bleep-bloop-api
 
       - name: Wait for deployment
         if: github.event_name == 'push'
@@ -108,7 +108,7 @@ jobs:
           KUBECONFIG: /home/dobowe01/.kube/config
         run: |
           kubectl rollout status deployment/bleep-bloop-api \
-            -n default \
+            -n bleep-bloop-api \
             --timeout=5m
 
       - name: Clean Docker build cache
