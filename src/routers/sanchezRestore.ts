@@ -1,7 +1,6 @@
 import { FastifyPluginAsync, FastifyRequest } from 'fastify'
 import { createReadStream } from 'node:fs'
 import SanchezRestoreController from '../controllers/sanchezRestore'
-import { validateJWT } from '../middleware/jwt'
 import { CreateProjectInput, UpdateProjectInput, UploadImageInput } from '../types/sanchezRestore'
 
 export async function parseProjectForm(request: FastifyRequest, includeRemovedImages: boolean): Promise<CreateProjectInput | UpdateProjectInput> {
@@ -60,23 +59,23 @@ export const SanchezRestore: FastifyPluginAsync = async (fastify) => {
         if (!project) return reply.code(404).send({ error: 'Project not found' })
         return { success: true, project, images: await SanchezRestoreController.listImages(project.id) }
     })
-    fastify.post('/projects', { preHandler: validateJWT }, async request => {
+    fastify.post('/projects', async request => {
         const parsed = await parseProjectRequest(request, false) as CreateProjectInput
         request.log.info({ imageCount: parsed.images.length }, 'sanchezRestore project upload parsed')
         const project = await SanchezRestoreController.createProject(parsed)
         return { success: true, project }
     })
-    fastify.put<{ Params: { id: string } }>('/projects/:id', { preHandler: validateJWT }, async (request, reply) => {
+    fastify.put<{ Params: { id: string } }>('/projects/:id', async (request, reply) => {
         const project = await SanchezRestoreController.updateProject(request.params.id, await parseProjectRequest(request, true) as UpdateProjectInput)
         if (!project) return reply.code(404).send({ error: 'Project not found' })
         return { success: true, project }
     })
-    fastify.delete<{ Params: { id: string } }>('/projects/:id', { preHandler: validateJWT }, async (request, reply) => {
+    fastify.delete<{ Params: { id: string } }>('/projects/:id', async (request, reply) => {
         if (!await SanchezRestoreController.deleteProject(request.params.id)) return reply.code(404).send({ error: 'Project not found' })
         return { success: true }
     })
     fastify.get<{ Params: { projectId: string } }>('/projects/:projectId/images', async request => ({ success: true, images: await SanchezRestoreController.listImages(request.params.projectId) }))
-    fastify.post<{ Params: { projectId: string } }>('/projects/:projectId/images', { preHandler: validateJWT }, async (request, reply) => {
+    fastify.post<{ Params: { projectId: string } }>('/projects/:projectId/images', async (request, reply) => {
         let upload: { filename: string, mimetype: string, buffer: Buffer } | undefined
         const fields: Record<string, string> = {}
         for await (const part of request.parts()) {
@@ -92,7 +91,7 @@ export const SanchezRestore: FastifyPluginAsync = async (fastify) => {
         if (!result) return reply.code(404).send({ error: 'Image not found' })
         return reply.type(result.image.mimeType).send(createReadStream(result.fullPath))
     })
-    fastify.delete<{ Params: { id: string } }>('/images/:id', { preHandler: validateJWT }, async (request, reply) => {
+    fastify.delete<{ Params: { id: string } }>('/images/:id', async (request, reply) => {
         if (!await SanchezRestoreController.deleteImage(request.params.id)) return reply.code(404).send({ error: 'Image not found' })
         return { success: true }
     })
