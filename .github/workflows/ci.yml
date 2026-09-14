@@ -34,12 +34,6 @@ jobs:
       - name: Build application
         run: npm run build
 
-      - name: Clean Docker build cache
-        if: always()
-        run: |
-          docker builder prune --all --force
-          docker image prune --all --force
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -65,7 +59,7 @@ jobs:
           KUBECONFIG: /home/dobowe01/.kube/config
         run: |
           kubectl create secret generic bleep-bloop-api-email \
-            -n bleep-bloop-api \
+            -n bleep-api \
             --from-literal=GMAIL_USER="${{ secrets.GMAIL_USER }}" \
             --from-literal=GMAIL_APP_PASSWORD="${{ secrets.GMAIL_APP_PASSWORD }}" \
             --from-literal=DEFAULT_EMAIL_TO="${{ secrets.DEFAULT_EMAIL_TO }}" \
@@ -77,7 +71,7 @@ jobs:
           KUBECONFIG: /home/dobowe01/.kube/config
         run: |
           kubectl create secret generic bleep-bloop-api-database \
-            -n bleep-bloop-api \
+            -n bleep-api \
             --from-literal=DB_USER="${{ secrets.DB_USER }}" \
             --from-literal=DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
             --from-literal=DB_SERVER="${{ secrets.DB_SERVER }}" \
@@ -100,7 +94,7 @@ jobs:
         run: |
           kubectl set image deployment/bleep-bloop-api \
             bleep-bloop-api=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
-            -n bleep-bloop-api
+            -n bleep-api
 
       - name: Wait for deployment
         if: github.event_name == 'push'
@@ -108,7 +102,7 @@ jobs:
           KUBECONFIG: /home/dobowe01/.kube/config
         run: |
           kubectl rollout status deployment/bleep-bloop-api \
-            -n bleep-bloop-api \
+            -n bleep-api \
             --timeout=5m
 
       - name: Clean Docker build cache
