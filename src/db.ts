@@ -43,6 +43,10 @@ export const beepPool = async (): Promise<sql.ConnectionPool> => {
     }
 };
 
+export const emailPool = async (): Promise<sql.ConnectionPool> => {
+    return beepPool();
+};
+
 export const closePool = async (): Promise<void> => {
     if (pool) {
         await pool.close();

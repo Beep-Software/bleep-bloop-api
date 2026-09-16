@@ -1,11 +1,6 @@
 import { FastifyReply, FastifyRequest } from 'fastify'
 import EmailService from '../services/email'
-
-interface CreateEmailRequest {
-	to?: string
-	subject?: string
-	body?: string
-}
+import { CreateEmailRequest } from '../types/email'
 
 export default class EmailController {
 
@@ -17,6 +12,7 @@ export default class EmailController {
 		const to = req.body?.to ?? defaultRecipient
 		const subject = decodeURIComponent(req.body?.subject ?? 'Bleep Bloop API test email')
 		const text = req.body?.body ?? 'This is a test email sent from the Bleep Bloop API.'
+		const from = process.env.DEFAULT_EMAIL_FROM ?? gmailUser ?? ''
 
 		if (!to) {
 			return res.status(400).send({
@@ -27,6 +23,20 @@ export default class EmailController {
 
 		if (!gmailUser || !gmailAppPassword) {
 			req.log.error('Missing Gmail credentials. Set GMAIL_USER and GMAIL_APP_PASSWORD.')
+
+			try {
+				await EmailService.logEmail({
+					recipient: to,
+					sender: from || 'system',
+					subject,
+					body: text,
+					status: 'FAILURE',
+					errorMessage: 'Missing Gmail credentials. Set GMAIL_USER and GMAIL_APP_PASSWORD.'
+				})
+			} catch (logErr) {
+				req.log.error(logErr, 'Failed to log email failure to database')
+			}
+
 			return res.status(500).send({
 				success: false,
 				error: 'Missing Gmail credentials. Set GMAIL_USER and GMAIL_APP_PASSWORD.'
@@ -35,11 +45,26 @@ export default class EmailController {
 
 		try {
 			const info = await EmailService.send({
-				from: process.env.DEFAULT_EMAIL_FROM ?? gmailUser,
+				from,
 				to,
 				subject,
 				text
 			}, gmailUser, gmailAppPassword)
+
+			try {
+				await EmailService.logEmail({
+					recipient: to,
+					sender: from,
+					subject,
+					body: text,
+					status: 'SUCCESS',
+					messageId: info.messageId,
+					accepted: info.accepted ? JSON.stringify(info.accepted) : null,
+					rejected: info.rejected ? JSON.stringify(info.rejected) : null
+				})
+			} catch (logErr) {
+				req.log.error(logErr, 'Failed to log email success to database')
+			}
 
 			return res.send({
 				success: true,
@@ -49,6 +74,20 @@ export default class EmailController {
 			})
 		} catch (error) {
 			req.log.error(error)
+
+			try {
+				await EmailService.logEmail({
+					recipient: to,
+					sender: from,
+					subject,
+					body: text,
+					status: 'FAILURE',
+					errorMessage: error instanceof Error ? error.message : String(error)
+				})
+			} catch (logErr) {
+				req.log.error(logErr, 'Failed to log email failure to database')
+			}
+
 			return res.status(500).send({
 				success: false,
 				error: 'Failed to send test email.'
